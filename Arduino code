@@ -1,0 +1,204 @@
+//My ARduino code
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+#include <EEPROM.h>
+#include <RTClib.h>
+
+// LCD setting up of my code for prorotype
+LiquidCrystal_I2C lcd(0x27, 20, 4); // I2C address 0x27 for a 20x4 LCD
+
+// Servo setup
+Servo dispenserServo;
+
+// RTC setup
+RTC_DS1307 rtc;
+
+// Data structures for medicines and users
+struct Medicine {
+    char name[20];
+    int stock;
+};
+
+struct User {
+    char username[20];
+    char password[20];
+};
+
+// Array of medicines
+const int numMedicines = 5;
+Medicine medicines[numMedicines] = {
+    {"Paracetamol", 10},
+    {"Ibuprofen", 15},
+    {"Antacid", 8},
+    {"Cough Syrup", 5},
+    {"Antihistamine", 12}
+};
+
+// EEPROM storage addresses
+const int medicineStartAddress = 0;
+const int userStartAddress = 200; // Assuming medicines use the first 200 bytes
+
+// Initialize servo and other pins
+const int servoPin = 10;
+const int buzzerPin = 13;
+const int buttonPin = 6; // Button for menu selection
+
+// Current user
+User currentUser;
+
+// Utility function to play buzzer sound
+void playBuzzer() {
+    digitalWrite(buzzerPin, HIGH);
+    delay(200);
+    digitalWrite(buzzerPin, LOW);
+}
+
+// Function to initialize medicines in EEPROM
+void initializeMedicines() {
+    for (int i = 0; i < numMedicines; i++) {
+        EEPROM.put(medicineStartAddress + sizeof(Medicine) * i, medicines[i]);
+    }
+}
+
+// Function to read medicines from EEPROM
+void readMedicinesFromEEPROM() {
+    for (int i = 0; i < numMedicines; i++) {
+        EEPROM.get(medicineStartAddress + sizeof(Medicine) * i, medicines[i]);
+    }
+}
+
+// Function to update a single medicine in EEPROM
+void updateMedicineInEEPROM(int index) {
+    EEPROM.put(medicineStartAddress + sizeof(Medicine) * index, medicines[index]);
+}
+
+// Function to authenticate user
+bool authenticateUser(const char* username, const char* password) {
+    for (int i = 0; i < 10; i++) { // Assume max 10 users stored
+        User storedUser;
+        EEPROM.get(userStartAddress + sizeof(User) * i, storedUser);
+        if (strcmp(storedUser.username, username) == 0 && strcmp(storedUser.password, password) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Function to dispense medicine
+void dispenseMedicine(int medicineIndex) {
+    if (medicines[medicineIndex].stock > 0) {
+        medicines[medicineIndex].stock--;
+        updateMedicineInEEPROM(medicineIndex); // Update EEPROM
+        dispenserServo.write(90); // Rotate to dispense
+        delay(1000);
+        dispenserServo.write(0); // Return to original position
+        lcd.clear();
+        lcd.print("Dispensed: ");
+        lcd.print(medicines[medicineIndex].name);
+        playBuzzer();
+        delay(2000);
+    } else {
+        lcd.clear();
+        lcd.print("Out of stock");
+        playBuzzer();
+        delay(2000);
+    }
+}
+
+// Function to display medicine stock
+void displayStock() {
+    lcd.clear();
+    for (int i = 0; i < numMedicines; i++) {
+        lcd.setCursor(0, i % 4);
+        lcd.print(medicines[i].name);
+        lcd.print(": ");
+        lcd.print(medicines[i].stock);
+        if (i % 4 == 3) {
+            delay(3000);
+            lcd.clear();
+        }
+    }
+    delay(3000);
+}
+
+// Function to log transactions with RTC
+void logTransaction(const char* medicineName) {
+    DateTime now = rtc.now();
+    Serial.print("Medicine: ");
+    Serial.print(medicineName);
+    Serial.print(", Time: ");
+    Serial.print(now.hour());
+    Serial.print(":");
+    Serial.print(now.minute());
+    Serial.print(":");
+    Serial.println(now.second());
+}
+
+void setup() {
+    // Initialize Serial, LCD, Servo, Buzzer, RTC
+    Serial.begin(9600);
+    lcd.init();
+    lcd.backlight();
+    dispenserServo.attach(servoPin);
+    pinMode(buzzerPin, OUTPUT);
+    pinMode(buttonPin, INPUT_PULLUP);
+
+    if (!rtc.begin()) {
+        Serial.println("Couldn't find RTC");
+        while (1);
+    }
+    if (!rtc.isrunning()) {
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
+
+    // Initialize or read data from EEPROM
+    initializeMedicines();
+    readMedicinesFromEEPROM();
+
+    // Welcome message
+    lcd.clear();
+    lcd.print("Welcome to Med ATM");
+    delay(2000);
+}
+
+void loop() {
+    // Main menu
+    lcd.clear();
+    lcd.print("1. Dispense Med");
+    lcd.setCursor(0, 1);
+    lcd.print("2. View Stock");
+    lcd.setCursor(0, 2);
+    lcd.print("3. Admin Login");
+
+    while (digitalRead(buttonPin) == HIGH); // Wait for button press
+
+    int choice = 0; // Dummy choice for menu navigation
+    if (choice == 1) {
+        // Dispense Medicine
+        lcd.clear();
+        lcd.print("Select Medicine:");
+        for (int i = 0; i < numMedicines; i++) {
+            lcd.setCursor(0, i % 4);
+            lcd.print(i + 1);
+            lcd.print(". ");
+            lcd.print(medicines[i].name);
+            if (i % 4 == 3) {
+                delay(3000);
+                lcd.clear();
+            }
+        }
+        // Example dispense
+        int medChoice = 0; // Assume a button selects medicine
+        dispenseMedicine(medChoice);
+        logTransaction(medicines[medChoice].name);
+    } else if (choice == 2) {
+        // View Stock
+        displayStock();
+    } else if (choice == 3) {
+        // Admin login to view or reset
+        lcd.clear();
+        lcd.print("Admin Login");
+    }
+    delay(2000);
+}
