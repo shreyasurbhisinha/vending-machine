@@ -5,16 +5,16 @@
 #include <EEPROM.h>
 #include <RTClib.h>
 
-// LCD setting up of my code for prorotype
+
 LiquidCrystal_I2C lcd(0x27, 20, 4); // I2C address 0x27 for a 20x4 LCD
 
-// Servo setup
+
 Servo dispenserServo;
 
-// RTC setup
+
 RTC_DS1307 rtc;
 
-// Data structures for medicines and users
+
 struct Medicine {
     char name[20];
     int stock;
@@ -25,7 +25,7 @@ struct User {
     char password[20];
 };
 
-// Array of medicines
+
 const int numMedicines = 5;
 Medicine medicines[numMedicines] = {
     {"Paracetamol", 10},
@@ -35,45 +35,45 @@ Medicine medicines[numMedicines] = {
     {"Antihistamine", 12}
 };
 
-// EEPROM storage addresses
+
 const int medicineStartAddress = 0;
 const int userStartAddress = 200; // Assuming medicines use the first 200 bytes
 
-// Initialize servo and other pins
+
 const int servoPin = 10;
 const int buzzerPin = 13;
 const int buttonPin = 6; // Button for menu selection
 
-// Current user
+
 User currentUser;
 
-// Utility function to play buzzer sound
+
 void playBuzzer() {
     digitalWrite(buzzerPin, HIGH);
     delay(200);
     digitalWrite(buzzerPin, LOW);
 }
 
-// Function to initialize medicines in EEPROM
+
 void initializeMedicines() {
     for (int i = 0; i < numMedicines; i++) {
         EEPROM.put(medicineStartAddress + sizeof(Medicine) * i, medicines[i]);
     }
 }
 
-// Function to read medicines from EEPROM
+
 void readMedicinesFromEEPROM() {
     for (int i = 0; i < numMedicines; i++) {
         EEPROM.get(medicineStartAddress + sizeof(Medicine) * i, medicines[i]);
     }
 }
 
-// Function to update a single medicine in EEPROM
+
 void updateMedicineInEEPROM(int index) {
     EEPROM.put(medicineStartAddress + sizeof(Medicine) * index, medicines[index]);
 }
 
-// Function to authenticate user
+
 bool authenticateUser(const char* username, const char* password) {
     for (int i = 0; i < 10; i++) { // Assume max 10 users stored
         User storedUser;
@@ -85,7 +85,7 @@ bool authenticateUser(const char* username, const char* password) {
     return false;
 }
 
-// Function to dispense medicine
+
 void dispenseMedicine(int medicineIndex) {
     if (medicines[medicineIndex].stock > 0) {
         medicines[medicineIndex].stock--;
@@ -106,7 +106,7 @@ void dispenseMedicine(int medicineIndex) {
     }
 }
 
-// Function to display medicine stock
+
 void displayStock() {
     lcd.clear();
     for (int i = 0; i < numMedicines; i++) {
@@ -122,7 +122,7 @@ void displayStock() {
     delay(3000);
 }
 
-// Function to log transactions with RTC
+
 void logTransaction(const char* medicineName) {
     DateTime now = rtc.now();
     Serial.print("Medicine: ");
@@ -136,7 +136,7 @@ void logTransaction(const char* medicineName) {
 }
 
 void setup() {
-    // Initialize Serial, LCD, Servo, Buzzer, RTC
+ 
     Serial.begin(9600);
     lcd.init();
     lcd.backlight();
@@ -152,11 +152,11 @@ void setup() {
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
-    // Initialize or read data from EEPROM
+  
     initializeMedicines();
     readMedicinesFromEEPROM();
 
-    // Welcome message
+   
     lcd.clear();
     lcd.print("Welcome to Med ATM");
     delay(2000);
